@@ -1,0 +1,58 @@
+{
+  "ON": "#00D800",
+  "OFF": "#FF0000",
+  "OFFL": "gray",
+  
+  "dummy_valve": 255,
+  
+  "valves": [
+    {
+      "no": 0,
+	  "pin": "12", //D6
+      "status": "OFF",
+      "label": "Garden Lights"
+    },
+    {
+      "no": 1,
+	  "pin": "2", //D4
+      "status": "OFF",
+      "label": "Gate"
+    },
+    {
+      "no": 2,
+	  "pin": "0", //D3
+      "status": "OFF",
+      "label": "Watering"
+    },
+    {
+      "no": 3,
+	  "pin": "14", //D5
+      "status": "OFF",
+      "label": "Spare"
+    },
+    {
+      "no": 4,
+	  "pin": 255,
+      "status": "OFFLINE",
+      "label": "Unused"
+    },
+    {
+      "no": 5,
+	  "pin": 255,
+      "status": "OFFLINE",
+      "label": "Unused"
+    },
+    {
+      "no": 6,
+	  "pin": 255,
+      "status": "OFFLINE",
+	  "label": "Unused"
+    },
+    {
+      "no": 7,
+	  "pin": 255,
+      "status": "OFFLINE",
+	  "label": "Unused"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+/** MAIN PAGE **/
+.unselectable {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+.valve{
+	width: 100px;
+	height: 100px;
+	display: inline;
+	zoom: 300%;
+}
+.valve_label{
+	text-align: center;
+}
+BODY{
+	padding: 0px;
+	margin: 0px;
+	font: 11px Tahoma;
+}
+.header{
+	padding: 10px;
+	background-color: #F2F2F2;
+	color: #000000;
+	font: 20px Tahoma;
+}
+#valves{
+	text-align:center;
+	
+}
+
+/** CONFIGURATION **/
+.valvenumber{
+	font-size: 14px;
+	font-weight: bold;
+	color: black;
+}
+.inputsmall{
+	width: 100px;
+	border: solid 1px #F2F2F2;
+	color: black;
+}
+.buttonmedium{
+	background-color: #F2F2F2;
+	border: solid 1px black;
+}
