@@ -1,0 +1,46 @@
+<div class="header">
+	<span class="header-title">Valve Control System</span>
+	<span class="header-links"><a href="/configuration.html">Configure</a></span>
+</div>
+		<div class="center-div">
+			<form action="/configuration.save" method="POST">
+				<table cellspacing="5">
+					<tr>
+						<td colspan="2">WIFI Setup</td>
+					</tr>
+					<tr>
+						<td align="right"><label for="_ssid">SSID: </label></td>
+						<td><input type="text" name="_ssid"/></td>
+					</tr>
+					<tr>
+						<td align="right"><label for="_password">Password: </label></td>
+						<td><input type="password" name="_password"/></td>
+					</tr>
+					<tr>
+						<td align="right"><label for="_host">Host: </label></td>
+						<td><input type="text" name="_host"/></td>
+					</tr>
+				</table>
+			
+				<!-- RELAYS -->
+				
+				<hr/>
+				
+				<table width="100%" cellspacing="5">
+					<tr>
+						<td><input type="submit" value="Save Configuration" style="width:100%"/></td>
+					</tr>
+					<tr>
+						<td>
+							<form action="/configuration.reset" method="POST"><input type="submit" value="Factory Reset" style="width:100%"/></form>
+						</td>
+					</tr>
+					<tr>
+						<td>
+							<form action="/configuration.import" method="POST"><input type="submit" value="Update Interfaces" style="width:100%"/></form>
+						</td>
+					</tr>
+				</table>
+			
+			</form>
+		</div>

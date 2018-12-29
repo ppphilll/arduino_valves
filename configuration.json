@@ -1,32 +1,26 @@
-{
-  "ON": "#00D800",
-  "OFF": "#FF0000",
-  "OFFL": "gray",
-  
-  "dummy_valve": 255,
-  
+{  
   "valves": [
     {
       "no": 0,
-	  "pin": "12", //D6
+	  "pin": "12", 
       "status": "OFF",
       "label": "Garden Lights"
     },
     {
       "no": 1,
-	  "pin": "2", //D4
+	  "pin": "2", 
       "status": "OFF",
       "label": "Gate"
     },
     {
       "no": 2,
-	  "pin": "0", //D3
+	  "pin": "0", 
       "status": "OFF",
       "label": "Watering"
     },
     {
       "no": 3,
-	  "pin": "14", //D5
+	  "pin": "14", 
       "status": "OFF",
       "label": "Spare"
     },

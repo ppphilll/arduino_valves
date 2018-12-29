@@ -21,26 +21,58 @@ BODY{
 	margin: 0px;
 	font: 11px Tahoma;
 }
+#valves{
+	text-align:center;
+	padding: 20px;
+	
+}
+body
+{
+	background-color: #fcfcfc;
+}
+.center-div
+{
+	border: solid 1px grey;
+	display: table;
+	margin-right: auto;
+	margin-left: auto;
+	position: relative;
+	border-radius: 10px;
+}
+.center-div div{
+	padding:5px;
+}
+.center-div div div div:first-child{
+	float: left;
+}
+.center-div div div div:last-child{
+	float: right;
+}
+.hr{
+	border: none;
+	border-bottom: solid 1px grey;
+}
 .header{
 	padding: 10px;
 	background-color: #F2F2F2;
 	color: #000000;
+	border-bottom: solid 1px grey;
+}
+.header-title{
 	font: 20px Tahoma;
 }
-#valves{
-	text-align:center;
-	
+.header-links{
+	font: 11pt Tahoma;
+	float: right;
 }
-
-/** CONFIGURATION **/
 .valvenumber{
 	font-size: 14px;
 	font-weight: bold;
 	color: black;
 }
 .inputsmall{
-	width: 100px;
-	border: solid 1px #F2F2F2;
+	width: 50px;
+	border: solid 1px gray;
 	color: black;
 }
 .buttonmedium{
