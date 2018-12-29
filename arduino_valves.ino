@@ -20,8 +20,6 @@
  * for storing a new configuration.
  * 
  * */
-// last edit 2018/12/29 by Surepic
-
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
@@ -92,8 +90,8 @@ void setup(void){
 
   //print obtained values
   Serial.println(F("WIFI values in EEPROM"));
-  Serial.println("SSID: " + wifi_config.ssid);
-  Serial.println("Password: " + wifi_config.password);
+  Serial.println(String("SSID: ") + String(wifi_config.ssid));
+  Serial.println(String("Password: ") + String(wifi_config.password));
   Serial.println(F("----"));
   
   //setup wifi with struct's WIFI credentials
@@ -131,7 +129,7 @@ String getWifiSetup(){
   
   String out = "";
   
-  for (byte i=0; i<wifi_config.getValveCount()>>1; i++){ //i<wifi_config.getValvecount()>>2
+  for (int i=0; i<wifi_config.getValveCount()/2; i++){
     char valve_no[2];
     char valve_pin[2];
     char valve_no_advanced[2];
@@ -141,19 +139,18 @@ String getWifiSetup(){
     memset(valve_pin, '\0', sizeof(valve_pin));
     memset(valve_no_advanced, '\0', sizeof(valve_no_advanced));
     memset(valve_pin_advanced, '\0', sizeof(valve_pin_advanced));
-    
-    valve_no=i+49;
-    valve_pin=wifi_config.valves[i]+48;
-    valve_no_advanced=i+1+(wifi_config.getValveCount()>>1);
-    valve_pin_advanced=wifi_config.valves[i+(wifi_config.getValveCount()>>1)];
-    
+
+    itoa((i + 1), valve_no, 10);
+    itoa(wifi_config.valves[i], valve_pin, 10);
+    itoa((i + 1 + wifi_config.getValveCount()/2), valve_no_advanced, 10);
+    itoa((wifi_config.valves[(i + (wifi_config.getValveCount()/2))]), valve_pin_advanced, 10);
     
     out += sHTML;
     
     out.replace("relay_$", String(valve_no));
     out.replace("relay_value_$", String(valve_pin));
     
-    if (i < wifi_config.getValveCount()>>1){
+    if (i < (wifi_config.getValveCount()/2)){
       out.replace("relay_#", String(valve_no_advanced));
       out.replace("relay_value_#", String(valve_pin_advanced));
     }
@@ -246,9 +243,9 @@ void handleAdminSave(){
   memset(_host,'\0',sizeof(_host));
 
   Serial.println(F("RAW server args"));
-  Serial.println("ssid: " + server.arg("_ssid"));
-  Serial.println("password: " + server.arg("_password"));
-  Serial.println("host: " + server.arg("_host"));
+  Serial.println(String("ssid: ") + server.arg("_ssid"));
+  Serial.println(String("password: ") + server.arg("_password"));
+  Serial.println(String("host: ") + server.arg("_host"));
   Serial.println(F("----"));
 
   strncpy(_ssid, server.arg("_ssid").c_str(), 20);
@@ -256,13 +253,13 @@ void handleAdminSave(){
   strncpy(_host, server.arg("_host").c_str(), 15);
 
   Serial.println(F("Received values for configuration"));
-  Serial.println("SSID: " + _ssid);
-  Serial.println("Password: " + _password);
-  Serial.println("Host: " + _host);
+  Serial.println(String("SSID: ") + _ssid);
+  Serial.println(String("Password: ") + _password);
+  Serial.println(String("Host: ") + _host);
   Serial.println(F("-----"));
 
   //update the ssid and password
-  if (!((*_ssid)&(*_password)&(*_host))){
+  if (!(_ssid[0]&_password[0]&_host[0])){
     //update the ssid and password
     strcpy(wifi_config.ssid, _ssid);
     strcpy(wifi_config.password, _password);
@@ -276,9 +273,9 @@ void handleAdminSave(){
   }
 
   Serial.println(F("Object stored values for configuration"));
-  Serial.println("SSID: " + wifi_config.ssid);
-  Serial.println("Password: " + wifi_config.password);
-  Serial.println("Host: " + wifi_config.host);
+  Serial.println(String("SSID: ") + wifi_config.ssid);
+  Serial.println(String("Password: ") + wifi_config.password);
+  Serial.println(String("Host: ") + wifi_config.host);
   Serial.println(F("-----"));
 
   //do a final update on the eeprom
@@ -328,16 +325,16 @@ void handleRequest(){
   String page = "";
   page += getPageStart(wifi_config.host);
 
-  Serial.println("Valve count: " + sizeof(wifi_config.valves));
-  Serial.println("Dummy valve: " + wifi_config.dummy_valve);
+  Serial.println(String("Valve count: ") + sizeof(wifi_config.valves));
+  Serial.println(String("Dummy valve: ") + wifi_config.dummy_valve);
 
   //valves
   page += "<div id='valves'>";
   for (byte i=0; i<wifi_config.getValveCount(); i++){
 
-    Serial.println("Processing valve relay: " + wifi_config.valves[i]);
+    Serial.println(String("Processing valve relay: ") + wifi_config.valves[i]);
     
-    bool isDummy = wifi_config.valves[i] == wifi_config.dummy_valve;    
+    bool isDummy = (wifi_config.valves[i] == wifi_config.dummy_valve);    
     page += makeValve(i, wifi_config.valveStatuses[i], isDummy);
   }
   page += "</div>";
@@ -356,8 +353,8 @@ void handleAjax(){
   valvestatus = (server.arg("valvestatus")=="on" ? true : (server.arg("valvestatus")=="off" ? false : false));  //default valves to off when undefined
 
   Serial.println(F("Valve status change"));
-  Serial.println("Valve no received: " + valveno);
-  Serial.println("Valve status received: " + valvestatus);
+  Serial.println(String("Valve no received: ") + valveno);
+  Serial.println(String("Valve status received: ") + valvestatus);
   Serial.println(F("----"));
   
   //do nothing for dummy valves
@@ -374,8 +371,8 @@ void handleAjax(){
   //Serial.println(String("Processing valves count: ") + wifi_config.getValveCount());
 
   for (byte i=0; i<wifi_config.getValveCount(); i++){
-    bool isDummy = wifi_config.valves[i] == wifi_config.dummy_valve; //variable redeclaration ????
-    String _state = wifi_config.valveStatuses[i] ? "ON" : "OFF";
+    bool isDummy = (wifi_config.valves[i] == wifi_config.dummy_valve); //variable redeclaration ????
+    String _state = (wifi_config.valveStatuses[i] ? "ON" : "OFF");
     if (isDummy) _state = "OFFLINE"; 
 
     JsonObject& valve = valves.createNestedObject();
@@ -397,7 +394,7 @@ String makeValve(int i, bool state, bool isDummy){
   dwg += "<g><g><g> <path id='valve_path_$' d='M490,250V80h-71.188C411.598,34.719,372.28,0,325,0c-47.28,0-86.598,34.719-93.812,80H190V62.293L116.241,50H0v230 h116.241L190,267.707V250h40v70h-20v90h20v80h190v-80h20v-90h-20v-70H490z M160,242.293L113.758,250H30v-36.667h85.417 L160,210.856V242.293z M160,180.81l-45.416,2.523H30v-36.667h84.584L160,149.19V180.81z M160,119.144l-44.583-2.477H30V80h83.758 L160,87.707V119.144z M325,30c35.841,0,65,29.159,65,65s-29.159,65-65,65s-65-29.159-65-65S289.159,30,325,30z M390,460H260v-50 h130V460z M410,380H240v-30h170V380z M390,220v100H260V220h-70V110h41.188c7.214,45.281,46.532,80,93.812,80 c47.28,0,86.598-34.719,93.812-80H460v110H390z' fill='COLOR_'/>";
   dwg += "<text id='valve_text_$' class='valve_label' x='0' y='550' font-family='Tahoma' font-size='50'>TEXT_</text></g></g></g></svg></div>";
 
-  String _state = state ? "ON" : "OFF";
+  String _state = (state ? "ON" : "OFF");
 
   if (isDummy) _state = "OFFLINE"; 
 
@@ -436,7 +433,7 @@ void readConfiguration(){
     String _label = variant["valves"][i]["label"];
     bool _status = (variant["valves"][i]["status"]=="ON") ? true : false;
     
-    wifi_config.valves[i] = _pin.c_str()-48;
+    wifi_config.valves[i] = atoi(_pin.c_str());
     strcpy(wifi_config.valveLabels[i], _label.c_str());
     wifi_config.valveStatuses[i] = _status;
   }
@@ -454,9 +451,9 @@ bool saveConfiguration(){
   JsonArray& valves = root.createNestedArray("valves");
 
   for (byte i=0; i<wifi_config.getValveCount(); i++){
-    bool isDummy = wifi_config.valves[i] == wifi_config.dummy_valve; //again ???
-    String _state = wifi_config.valveStatuses[i] ? "ON" : "OFF";
-    if (isDummy) _state = "OFFLINE";
+    bool isDummy = (wifi_config.valves[i] == wifi_config.dummy_valve); //again ???
+    String _state = (wifi_config.valveStatuses[i] ? "ON" : "OFF");
+    if (isDummy){ _state = "OFFLINE"; }
 
     JsonObject& valve = valves.createNestedObject();
     valve["no"] = i;
@@ -471,8 +468,9 @@ bool saveConfiguration(){
 }
 
 void handleAdminReset(){
-  for (int i=0; i<512; EEPROM.write(i++,0));
-  
+  for (int i=0; i<512; i++){
+    EEPROM.write(i, 0);
+  }
   EEPROM.commit();
   
   server.sendHeader("Location", "/", true);
@@ -508,7 +506,7 @@ void setupWIFI(){
   WiFi.disconnect();
 
   //if either SSID or password is null, send them to the config page
-  if (!(*wifi_config.ssid) || !(*wifi_config.password)){
+  if (!strlen(wifi_config.ssid) || !strlen(wifi_config.password)){
     setupAP();
     return;
   }
@@ -521,8 +519,8 @@ void setupWIFI(){
   //wait for connection, print dots
   
   //###### what to do if connection fails
-  byte waitCount = 0;
-  const byte waitMax = 30;  //wait 30 seconds to connect to wifi
+  int waitCount = 0;
+  int waitMax = 30;  //wait 30 seconds to connect to wifi
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(F("."));
@@ -535,7 +533,7 @@ void setupWIFI(){
       lcd.clear();
       lcd.print(F("WIFI Unavailable"));
       delay(3000);
-      Serial.println("Connection attempts to " + wifi_config.ssid + "exceeded.  Setting up Access Point.");
+      Serial.println(String("Connection attempts to ") + wifi_config.ssid + String("exceeded.  Setting up Access Point."));
       setupAP();
       return;
     }
@@ -548,8 +546,9 @@ void setupWIFI(){
 
   //erase the dots
   lcd.setCursor(0, 0);
-  for (int i=0; i<waitCount; i++) lcd.print(F(" "));  
-  
+  for (int i=0; i<waitCount; i++){
+    lcd.print(F(" "));  
+  }
 
   //print some debug stuff
   Serial.println(F(""));
