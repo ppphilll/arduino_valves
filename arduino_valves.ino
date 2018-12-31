@@ -38,9 +38,10 @@ LiquidCrystal_I2C lcd(0x27, 20, 4);
 
 bool isWifiConnected = false;
 wifi_configuration_t wifi_config;
+const int EEPROM_SIZE = 2048;
 
 //the place holder for the html source code
-String configPage = "<div class=\"center-div\"><div><form action=\"/configuration.save\" method=\"POST\"><div>WIFI Setup</div><div><div><label for=\"_ssid\">SSID: </label></div><div><input type=\"text\" name=\"_ssid\"/></div></div><div><div align=\"right\"><label for=\"_password\">Password: </label></div><div><input type=\"password\" name=\"_password\"/></div></div><div><div align=\"right\"><label for=\"_host\">Host: </label></div><div><input type=\"text\" name=\"_host\"/></div></div><!-- RELAYS --><div><div><input type=\"submit\" value=\"Save Configuration\"/></div><div><form action=\"/configuration.reset\" method=\"POST\"><input type=\"submit\" value=\"Factory Reset\"></form></div><div><form action=\"/configuration.import\" method=\"POST\"><input type=\"submit\" value=\"Upload\"></form></div></div></form></div></div>";
+String configPage = "<div class=\"center-div\"><div><form action=\"/configuration.save\" method=\"POST\"><table><tr><th colspan=\"2\">WIFI Setup</th></tr><tr> <td><label for=\"_ssid\">SSID: </label></td><td><input type=\"text\" name=\"_ssid\"></td></tr><tr> <td><label for=\"_password\">Password: </label></td><td><input type=\"password\" name=\"_password\"></td></tr><tr> <td><label for=\"_host\">Host: </label></td><td><input type=\"text\" name=\"_host\"></td></tr></table><!-- RELAYS --><div><div><input type=\"submit\" value=\"Save Configuration\"/></div><div><form action=\"/configuration.reset\" method=\"POST\"><input type=\"submit\" value=\"Factory Reset\"></form></div><div><form action=\"/configuration.import\" method=\"POST\"><input type=\"submit\" value=\"Upload\"></form></div></div></form></div></div>";
 
 //html includes
 String pagestart_noscript = "<html><head></head><body>";
@@ -85,7 +86,7 @@ void setup(void){
   lcd.setCursor(0, 0);
 
   //try to read config from EEPROM
-  EEPROM.begin(4096);
+  EEPROM.begin(EEPROM_SIZE);
   EEPROM.get(0, wifi_config);
 
   //print obtained values
@@ -99,10 +100,11 @@ void setup(void){
 
   //read file configuration
   if (isWifiConnected){
-    // readConfiguration();
-      
-    //import the html for now out of the setup, to be reengineered later on
-    //handleAdminImport();
+    Serial.println("Valve configuration stored in EEPROM");
+    for (byte i=0; i<wifi_config.getValveCount(); i++){
+      Serial.println(String("Valve # ") + String(i) + String(" at pin ") + String(wifi_config.valves[i]) + String(" with label ") + String(wifi_config.valveLabels[i]));
+    }
+    Serial.println("----");
   }
   
   //attach a few handlers to the server
@@ -122,18 +124,23 @@ void setup(void){
 String getWifiSetup(){
   //formats the relay input names and assigns their value
   String sHTML = "<tr><td>Relay # relay_$</td>";
-         sHTML += "<td><input type=\"text\" name=\"relay_$\" value=\"relay_value_$\" class=\"inputsmall\"/>";
+         sHTML += "<td><input type=\"text\" name=\"pin_$\" value=\"relay_value_$\" class=\"inputsmall\"/>";
          sHTML += "<td>Relay # relay_#</td>";
-         sHTML += "<td><input type=\"text\" name=\"relay_#\" value=\"relay_value_#\" class=\"inputsmall\"/>";
+         sHTML += "<td><input type=\"text\" name=\"pin_#\" value=\"relay_value_#\" class=\"inputsmall\"/>";
          sHTML += "</tr>";
+         //break before the next field
+         sHTML += "<tr class=\"spaceAfter\"><td>Label</td><td><input type=\"text\" name=\"label_$\" value=\"relay_label_value_$\"/></td>";
+         sHTML += "<td>Label</td><td><input type=\"text\" name=\"label_#\" value=\"relay_label_value_#\"/></td></tr>";
   
   String out = "";
   
   for (int i=0; i<wifi_config.getValveCount()/2; i++){
     char valve_no[2];
     char valve_pin[2];
+    String relay_label_value;
     char valve_no_advanced[2];
     char valve_pin_advanced[2];
+    String relay_label_value_advanced;
 
     memset(valve_no, '\0', sizeof(valve_no));
     memset(valve_pin, '\0', sizeof(valve_pin));
@@ -144,19 +151,27 @@ String getWifiSetup(){
     itoa(wifi_config.valves[i], valve_pin, 10);
     itoa((i + 1 + wifi_config.getValveCount()/2), valve_no_advanced, 10);
     itoa((wifi_config.valves[(i + (wifi_config.getValveCount()/2))]), valve_pin_advanced, 10);
+    relay_label_value = wifi_config.valveLabels[i];
+    relay_label_value_advanced = wifi_config.valveLabels[(i + wifi_config.getValveCount()/2)];
     
     out += sHTML;
     
     out.replace("relay_$", String(valve_no));
+    out.replace("pin_$", String("pin_") + String(i));
+    out.replace("label_$", String("label_") + String(i));
     out.replace("relay_value_$", String(valve_pin));
+    out.replace("relay_label_value_$", relay_label_value);
     
     if (i < (wifi_config.getValveCount()/2)){
       out.replace("relay_#", String(valve_no_advanced));
+      out.replace("pin_#", String("pin_") + String(i+wifi_config.getValveCount()/2));
+      out.replace("label_#", String("label_") + String(i+wifi_config.getValveCount()/2));
       out.replace("relay_value_#", String(valve_pin_advanced));
+      out.replace("relay_label_value_#", relay_label_value_advanced);
     }
   }
 
-  String outtable = "<hr/><table cellspacing=\"5\"><tr><td colspan=\"4\">Pin Assignment</td></tr><!-- RELAYS INNER --></table>";
+  String outtable = "<hr/><table><tr><th colspan=\"4\">Pin Assignment</th></tr><!-- RELAYS INNER --></table>";
 
   outtable.replace("<!-- RELAYS INNER -->", out);
 
@@ -198,7 +213,7 @@ void handleNotFound(){
 //configure the wifi and the valve names and relay addresses
 void handleAdminServe(){
   //wifi credentials
-  String page = pagestart_noscript;
+  String page = getPageStart(wifi_config.host);
   page += getWifiSetup();
   page += pageend;
   
@@ -277,6 +292,29 @@ void handleAdminSave(){
   Serial.println(String("Password: ") + wifi_config.password);
   Serial.println(String("Host: ") + wifi_config.host);
   Serial.println(F("-----"));
+
+  Serial.println("Saving Valves...");
+  //relay information
+  for (byte i=0; i<wifi_config.getValveCount(); i++){
+    uint8_t _pin = server.arg(String("pin_") + String(i)).toInt();
+    String _label = server.arg(String("label_") + String(i));
+
+    Serial.println(String("Saving valve: ") + i + String(" Pin: ") + _pin + String(" Label: ") + _label);
+
+    if (_label.length()!=0){
+      //copy the pins and labels assigned
+      wifi_config.valves[i] = _pin;
+      strcpy(wifi_config.valveLabels[i], _label.c_str());
+    }else{
+      //return error
+      server.sendHeader("Location", "/configuration.html?error=1", true);
+      flashLCDWith("ERROR");
+      server.send(302, "text/plain", "");
+      return;
+    }
+  }
+  Serial.println("----");
+  //end relay information
 
   //do a final update on the eeprom
   EEPROM.put(0, wifi_config);
@@ -391,14 +429,18 @@ void handleAjax(){
 String makeValve(int i, bool state, bool isDummy){
 
   String dwg = "<div class='valve' status='status_$' id='valve_$'><svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' version='1.1' baseProfile='full' viewBox='0 0 590 590' width='128px' height='128px'>";
-  dwg += "<g><g><g> <path id='valve_path_$' d='M490,250V80h-71.188C411.598,34.719,372.28,0,325,0c-47.28,0-86.598,34.719-93.812,80H190V62.293L116.241,50H0v230 h116.241L190,267.707V250h40v70h-20v90h20v80h190v-80h20v-90h-20v-70H490z M160,242.293L113.758,250H30v-36.667h85.417 L160,210.856V242.293z M160,180.81l-45.416,2.523H30v-36.667h84.584L160,149.19V180.81z M160,119.144l-44.583-2.477H30V80h83.758 L160,87.707V119.144z M325,30c35.841,0,65,29.159,65,65s-29.159,65-65,65s-65-29.159-65-65S289.159,30,325,30z M390,460H260v-50 h130V460z M410,380H240v-30h170V380z M390,220v100H260V220h-70V110h41.188c7.214,45.281,46.532,80,93.812,80 c47.28,0,86.598-34.719,93.812-80H460v110H390z' fill='COLOR_'/>";
+  dwg += "<g><g><g> <path id='valve_path_$' d='M490,250V80h-71.188C411.598,34.719,372.28,0,325,0c-47.28,0-86.598,34.719-93.812,80H190V62.293L116.241,50H0v230 h116.241L190,267.707V250h40v70h-20v90h20v80h190v-80h20v-90h-20v-70H490z M160,242.293L113.758,250H30v-36.667h85.417 L160,210.856V242.293z M160,180.81l-45.416,2.523H30v-36.667h84.584L160,149.19V180.81z M160,119.144l-44.583-2.477H30V80h83.758 L160,87.707V119.144z M325,30c35.841,0,65,29.159,65,65s-29.159,65-65,65s-65-29.159-65-65S289.159,30,325,30z M390,460H260v-50 h130V460z M410,380H240v-30h170V380z M390,220v100H260V220h-70V110h41.188c7.214,45.281,46.532,80,93.812,80 c47.28,0,86.598-34.719,93.812-80H460v110H390z' fill='COLOR_$'/>";
   dwg += "<text id='valve_text_$' class='valve_label' x='0' y='550' font-family='Tahoma' font-size='50'>TEXT_</text></g></g></g></svg></div>";
 
   String _state = (state ? "ON" : "OFF");
 
   if (isDummy) _state = "OFFLINE"; 
 
-  dwg.replace("COLOR_", (isDummy ? wifi_config.OFFL : (state==true ? wifi_config.ON : wifi_config.OFF)));
+  Serial.println("VALVE COLOR");
+  Serial.println((isDummy ? wifi_config.OFFL : (state ? wifi_config.ON : wifi_config.OFF)));
+  Serial.println("----");
+
+  dwg.replace("COLOR_$", (isDummy ? wifi_config.OFFL : (state==true ? wifi_config.ON : wifi_config.OFF)));
   dwg.replace("status_$", _state);
   dwg.replace("valve_$", String("valve_") += String(i));
   dwg.replace("valve_path_$", String("valve_path_") += String(i));
@@ -408,6 +450,9 @@ String makeValve(int i, bool state, bool isDummy){
   return dwg;
 }
 
+
+//deprecated, left here for reference to methods only
+/*
 void readConfiguration(){
   HTTPClient http;
 
@@ -423,8 +468,14 @@ void readConfiguration(){
   //get the config file
   String payload = http.getString();
 
+  Serial.println("HERE IS THE PAYLOAD");
+  Serial.println(payload);
+  Serial.println("----");
+
+  return;
+
   //parse json object
-  StaticJsonBuffer<2000> jsonBuffer;
+  StaticJsonBuffer<900> jsonBuffer;
   JsonVariant variant = jsonBuffer.parse(payload);
 
   //convert json object into configuration struct
@@ -437,12 +488,14 @@ void readConfiguration(){
     strcpy(wifi_config.valveLabels[i], _label.c_str());
     wifi_config.valveStatuses[i] = _status;
   }
-
 }
+*/
 
 //saves the configuration read by the readConfiguration method 
 //to the EEPROM.  The readConfiguration method reads the primer
 //or the startup values and stores them in memory.
+//deprecated, left here for reference to methods only
+/*
 bool saveConfiguration(){
 
   String out = "";
@@ -466,9 +519,10 @@ bool saveConfiguration(){
   
   return true;
 }
+*/
 
 void handleAdminReset(){
-  for (int i=0; i<512; i++){
+  for (int i=0; i<EEPROM_SIZE; i++){
     EEPROM.write(i, 0);
   }
   EEPROM.commit();
