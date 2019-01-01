@@ -41,10 +41,10 @@ wifi_configuration_t wifi_config;
 const int EEPROM_SIZE = 2048;
 
 //the place holder for the html source code
-String configPage = "<div class=\"center-div\"><div><form action=\"/configuration.save\" method=\"POST\"><table><tr><th colspan=\"2\">WIFI Setup</th></tr><tr> <td><label for=\"_ssid\">SSID: </label></td><td><input type=\"text\" name=\"_ssid\"></td></tr><tr> <td><label for=\"_password\">Password: </label></td><td><input type=\"password\" name=\"_password\"></td></tr><tr> <td><label for=\"_host\">Host: </label></td><td><input type=\"text\" name=\"_host\"></td></tr></table><!-- RELAYS --><div><div><input type=\"submit\" value=\"Save Configuration\"/></div><div><form action=\"/configuration.reset\" method=\"POST\"><input type=\"submit\" value=\"Factory Reset\"></form></div><div><form action=\"/configuration.import\" method=\"POST\"><input type=\"submit\" value=\"Upload\"></form></div></div></form></div></div>";
+String configPage = "<div class=\"center-div\"><div><div class=\"container\"><form action=\"/configuration.save\" method=\"POST\"><table><tr><th colspan=\"2\">WIFI Setup</th></tr><tr> <td><label for=\"_ssid\">SSID: </label></td><td><input type=\"text\" name=\"_ssid\"></td></tr><tr> <td><label for=\"_password\">Password: </label></td><td><input type=\"password\" name=\"_password\"></td></tr><tr> <td><label for=\"_host\">Host: </label></td><td><input type=\"text\" name=\"_host\"></td></tr></table><!-- RELAYS --></div><div class=\"container\" style=\"float: right;\"></div><hr/><div><div><input type=\"submit\" value=\"Save Configuration\"/></div><div><form action=\"/configuration.reset\" method=\"POST\"><input type=\"submit\" value=\"Factory Reset\"></form></div></div></div></form></div></div>";
 
 //html includes
-String pagestart_noscript = "<html><head></head><body>";
+String redirect = "<html><head><meta http-equiv=\"refresh\" content=\"10;url=/\" /></head><body>Redirecting in 10 seconds...</body></html>";
 String pagestart = "<html><head><script src=\"https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js\"></script><script src=\"http://HOST_$/valves/script.js\"></script><link rel=\"stylesheet\" href=\"http://HOST_$/valves/style.css\"></head><body><div class=\"header\"><span class=\"header-title\">Valve Control System</span><span class=\"header-links\"><a href=\"/configuration.html\">Configure</a></span></div>";
 String pageend = "</body></html>";
 
@@ -72,12 +72,6 @@ void setup(void){
   ArduinoOTA.begin();
   //OTA PROGRAMMING SECTION ENDS
 
-  //initialize the valves
-  for (byte i=0; i<sizeof(wifi_config.valves) && (wifi_config.valves[i] != wifi_config.dummy_valve); i++){
-      pinMode(wifi_config.valves[i], OUTPUT);
-      digitalWrite(wifi_config.valves[i], LOW);
-  }
-
   Serial.println(F("Initializing display..."));
 
   //initialize the display
@@ -88,6 +82,12 @@ void setup(void){
   //try to read config from EEPROM
   EEPROM.begin(EEPROM_SIZE);
   EEPROM.get(0, wifi_config);
+
+  //setup some defaults
+  wifi_config.dummy_valve = 255;
+  wifi_config.ON = "#00D800";
+  wifi_config.OFF = "#FF0000";
+  wifi_config.OFFL = "gray";
 
   //print obtained values
   Serial.println(F("WIFI values in EEPROM"));
@@ -106,6 +106,17 @@ void setup(void){
     }
     Serial.println("----");
   }
+
+  //initialize the valves
+  for (byte i=0; i<wifi_config.getValveCount(); i++){ 
+    if (wifi_config.valves[i]!=wifi_config.dummy_valve){
+      pinMode(wifi_config.valves[i], OUTPUT);
+      digitalWrite(wifi_config.valves[i], LOW);
+    }else{
+      Serial.println(String("Valve ") + i + String(" at ") + wifi_config.valves[i] + String(" is DUMMY"));
+    }
+  }
+  Serial.println("----");
   
   //attach a few handlers to the server
   server.on("/", handleRequest);
@@ -171,7 +182,7 @@ String getWifiSetup(){
     }
   }
 
-  String outtable = "<hr/><table><tr><th colspan=\"4\">Pin Assignment</th></tr><!-- RELAYS INNER --></table>";
+  String outtable = "<table><tr><th colspan=\"4\">Pin Assignment</th></tr><!-- RELAYS INNER --></table>";
 
   outtable.replace("<!-- RELAYS INNER -->", out);
 
@@ -324,8 +335,7 @@ void handleAdminSave(){
   lcd.print(F("CONFIG SAVED"));
   delay(2000);
 
-  server.sendHeader("Location", "/", true);
-  server.send(302, "text/plain", "");
+  server.send(200, "text/html", redirect);
   delay(1000);
 
   ESP.restart();
@@ -370,7 +380,7 @@ void handleRequest(){
   page += "<div id='valves'>";
   for (byte i=0; i<wifi_config.getValveCount(); i++){
 
-    Serial.println(String("Processing valve relay: ") + wifi_config.valves[i]);
+    //Serial.println(String("Processing valve relay: ") + wifi_config.valves[i]);
     
     bool isDummy = (wifi_config.valves[i] == wifi_config.dummy_valve);    
     page += makeValve(i, wifi_config.valveStatuses[i], isDummy);
@@ -387,22 +397,28 @@ void handleAjax(){
   bool valvestatus = false;  //fail-safe for all valves
   
   valveno = server.arg("valveno").toInt();
-
   valvestatus = (server.arg("valvestatus")=="on" ? true : (server.arg("valvestatus")=="off" ? false : false));  //default valves to off when undefined
-
-  Serial.println(F("Valve status change"));
-  Serial.println(String("Valve no received: ") + valveno);
-  Serial.println(String("Valve status received: ") + valvestatus);
-  Serial.println(F("----"));
   
   //do nothing for dummy valves
   if (valveno!=wifi_config.dummy_valve){
-    digitalWrite(wifi_config.valves[valveno], valvestatus ? HIGH : LOW);
-    wifi_config.valveStatuses[valveno] = valvestatus;
+    //digitalWrite(0, valvestatus);
+    if (wifi_config.valves[valveno]==0){
+      digitalWrite(0, valvestatus ? HIGH : LOW);
+      wifi_config.valveStatuses[valveno] = valvestatus;
+    }else{
+      digitalWrite(wifi_config.valves[valveno], valvestatus ? HIGH : LOW);
+      wifi_config.valveStatuses[valveno] = valvestatus;
+    }
   }
 
+  Serial.println(F("Valve status change"));
+  Serial.println(String("Valve no received: ") + valveno);
+  Serial.println(String("Valve pin: ") + wifi_config.valves[valveno]);
+  Serial.println(String("Valve status received: ") + valvestatus);
+  Serial.println(F("----"));
+
   String out = "";
-  StaticJsonBuffer<600> jsonBuffer;
+  StaticJsonBuffer<700> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
   JsonArray& valves = root.createNestedArray("valves");
 
@@ -412,6 +428,8 @@ void handleAjax(){
     bool isDummy = (wifi_config.valves[i] == wifi_config.dummy_valve); //variable redeclaration ????
     String _state = (wifi_config.valveStatuses[i] ? "ON" : "OFF");
     if (isDummy) _state = "OFFLINE"; 
+
+    Serial.println(String("Writing JSON for valve ") + i);
 
     JsonObject& valve = valves.createNestedObject();
     valve["no"] = i;
@@ -436,11 +454,11 @@ String makeValve(int i, bool state, bool isDummy){
 
   if (isDummy) _state = "OFFLINE"; 
 
-  Serial.println("VALVE COLOR");
-  Serial.println((isDummy ? wifi_config.OFFL : (state ? wifi_config.ON : wifi_config.OFF)));
-  Serial.println("----");
+  //Serial.println("VALVE COLOR");
+  //Serial.println((isDummy ? wifi_config.OFFL : (state ? wifi_config.ON : wifi_config.OFF)));
+  //Serial.println("----");
 
-  dwg.replace("COLOR_$", (isDummy ? wifi_config.OFFL : (state==true ? wifi_config.ON : wifi_config.OFF)));
+  dwg.replace("COLOR_$", (isDummy ? "gray" : (state ? "#00D800" : "#FF0000")));
   dwg.replace("status_$", _state);
   dwg.replace("valve_$", String("valve_") += String(i));
   dwg.replace("valve_path_$", String("valve_path_") += String(i));
@@ -527,8 +545,7 @@ void handleAdminReset(){
   }
   EEPROM.commit();
   
-  server.sendHeader("Location", "/", true);
-  server.send(302, "text/plain", "");
+  server.send(200, "text/html", redirect);
   delay(1000);
 
   ESP.restart();

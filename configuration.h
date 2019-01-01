@@ -13,7 +13,7 @@ struct wifi_configuration_t
 	char host[15]; //host for the includes
 
   //valves
-  int dummy_valve = 255;
+  uint8_t dummy_valve;
   
   //valves
   uint8_t valves[8] = {D6, D4, D3, D5, 255, 255, 255, 255};
