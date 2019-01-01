@@ -39,9 +39,10 @@ LiquidCrystal_I2C lcd(0x27, 20, 4);
 bool isWifiConnected = false;
 wifi_configuration_t wifi_config;
 const int EEPROM_SIZE = 2048;
+const uint8_t avail_pins[5] = {12, 2, 0, 14, 255};
 
 //the place holder for the html source code
-String configPage = "<div class=\"center-div\"><div class=\"container\"><form action=\"/configuration.save\" method=\"POST\"><table><tr><th colspan=\"2\">WIFI Setup</th></tr><tr> <td><label for=\"_ssid\">SSID: </label></td><td><input type=\"text\" name=\"_ssid\"></td></tr><tr> <td><label for=\"_password\">Password: </label></td><td><input type=\"password\" name=\"_password\"></td></tr><tr> <td><label for=\"_host\">Host: </label></td><td><input type=\"text\" name=\"_host\"></td></tr></table><!-- RELAYS --></div><div class=\"container\" style=\"float:right\"><table><tr><th>Script</th></tr><tr><td><textarea name=\"script\"></textarea></td></tr><tr><th>Style</th></tr><tr><td><textarea name=\"style\"></textarea></td></tr></table></div><div><div><input type=\"submit\" value=\"Save Configuration\"/></div><div><form action=\"/configuration.reset\" method=\"POST\"><input type=\"submit\" value=\"Factory Reset\"></form></div></div></div></form></div></div>";
+String configPage = "<div id=\"config\" class=\"center-div\"><div class=\"container\"><form action=\"/configuration.save\" method=\"POST\"><table><tr><th colspan=\"2\">WIFI Setup</th></tr><tr> <td><label for=\"_ssid\">SSID: </label></td><td><input type=\"text\" name=\"_ssid\"></td></tr><tr> <td><label for=\"_password\">Password: </label></td><td><input type=\"password\" name=\"_password\"></td></tr><tr> <td><label for=\"_host\">Host: </label></td><td><input type=\"text\" name=\"_host\"></td></tr></table><!-- RELAYS --></div><div class=\"container\" style=\"float:right\"><table><tr><th>Script</th></tr><tr><td><textarea name=\"script\"></textarea></td></tr><tr><th>Style</th></tr><tr><td><textarea name=\"style\"></textarea></td></tr></table></div><div><div><input type=\"submit\" value=\"Save Configuration\"/></div></form><div><form action=\"/configuration.reset\" method=\"POST\"><input type=\"submit\" value=\"Factory Reset\"></form></div></div></div></div></div>";
 
 //html includes
 String redirect = "<html><head><meta http-equiv=\"refresh\" content=\"10;url=/\" /></head><body>Redirecting in 10 seconds...</body></html>";
@@ -50,7 +51,8 @@ String pageend = "</body></html>";
 
 void setup(void){
   Serial.begin(9600);
-
+  EEPROM.begin(EEPROM_SIZE);
+  
   //OTA PROGRAMMING SECTION BEGINS
   ArduinoOTA.onStart([]() {
     Serial.println(F("Start"));
@@ -79,16 +81,24 @@ void setup(void){
   lcd.backlight();
   lcd.setCursor(0, 0);
 
-  //try to read config from EEPROM
-  EEPROM.begin(EEPROM_SIZE);
-  EEPROM.get(0, wifi_config);
+  //read a byte from the EEPROM to see if its blank
+  byte contentsAtZero;
+  EEPROM.get(0, contentsAtZero);
+  Serial.println("EEPROM Contents");
+  Serial.println(contentsAtZero);
+  Serial.println("----"); 
 
-  //setup some defaults
-  wifi_config.dummy_valve = 255;
-  wifi_config.ON = "#00D800";
-  wifi_config.OFF = "#FF0000";
-  wifi_config.OFFL = "gray";
-
+  //check the EEPROM and/or setup some defaults
+  if (!contentsAtZero){
+    for (byte i=0; i<wifi_config.getValveCount(); i++){
+      wifi_config.valves[i] = wifi_config.dummy_valve;
+    }
+    wifi_config.dummy_valve = 255;
+  }else{
+    EEPROM.get(0, wifi_config);
+    wifi_config.dummy_valve = 255;
+  }
+  
   //print obtained values
   Serial.println(F("WIFI values in EEPROM"));
   Serial.println(String("SSID: ") + String(wifi_config.ssid));
@@ -132,16 +142,31 @@ void setup(void){
   Serial.println(F("HTTP server started"));
 }
 
+String getOptions(uint8_t selectedPin){
+  //generate the options for the selects
+  String options;
+  for (byte i=0; i<sizeof(avail_pins); i++){
+      options += "<option value=\"" + String(avail_pins[i]) + "\"";
+      if (avail_pins[i] == selectedPin){
+        options += " selected";
+      }
+      options += ">" + String(avail_pins[i]) + "</option>";
+  }
+  return options;
+}
+
 String getWifiSetup(){
+  
   //formats the relay input names and assigns their value
   String sHTML = "<tr><td>Relay # relay_$</td>";
-         sHTML += "<td><input type=\"text\" name=\"pin_$\" value=\"relay_value_$\" class=\"inputsmall\"/>";
+         sHTML += "<td><select name=\"pin_$\" class=\"inputsmall\"><!--OPTIONS_$-->";
+         sHTML += "</select></td>";
          sHTML += "<td>Relay # relay_#</td>";
-         sHTML += "<td><input type=\"text\" name=\"pin_#\" value=\"relay_value_#\" class=\"inputsmall\"/>";
-         sHTML += "</tr>";
+         sHTML += "<td><select name=\"pin_#\" class=\"inputsmall\"><!--OPTIONS_#-->";
+         sHTML += "</select></td></tr>";
          //break before the next field
-         sHTML += "<tr class=\"spaceAfter\"><td>Label</td><td><input type=\"text\" name=\"label_$\" value=\"relay_label_value_$\"/></td>";
-         sHTML += "<td>Label</td><td><input type=\"text\" name=\"label_#\" value=\"relay_label_value_#\"/></td></tr>";
+         sHTML += "<tr class=\"spaceAfter\"><td>Label</td><td><input type=\"text\" name=\"label_$\" value=\"relay_label_value_$\" required/></td>";
+         sHTML += "<td>Label</td><td><input type=\"text\" name=\"label_#\" value=\"relay_label_value_#\" required/></td></tr>";
   
   String out = "";
   
@@ -167,17 +192,19 @@ String getWifiSetup(){
     
     out += sHTML;
     
+    out.replace("<!--OPTIONS_$-->", getOptions(wifi_config.valves[i]));
     out.replace("relay_$", String(valve_no));
     out.replace("pin_$", String("pin_") + String(i));
     out.replace("label_$", String("label_") + String(i));
-    out.replace("relay_value_$", String(valve_pin));
+    //out.replace("relay_value_$", String(valve_pin));
     out.replace("relay_label_value_$", relay_label_value);
     
     if (i < (wifi_config.getValveCount()/2)){
+      out.replace("<!--OPTIONS_#-->", getOptions(wifi_config.valves[i+wifi_config.getValveCount()/2]));
       out.replace("relay_#", String(valve_no_advanced));
       out.replace("pin_#", String("pin_") + String(i+wifi_config.getValveCount()/2));
       out.replace("label_#", String("label_") + String(i+wifi_config.getValveCount()/2));
-      out.replace("relay_value_#", String(valve_pin_advanced));
+      //out.replace("relay_value_#", String(valve_pin_advanced));
       out.replace("relay_label_value_#", relay_label_value_advanced);
     }
   }

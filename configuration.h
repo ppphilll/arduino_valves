@@ -16,7 +16,7 @@ struct wifi_configuration_t
   uint8_t dummy_valve;
   
   //valves
-  uint8_t valves[8] = {D6, D4, D3, D5, 255, 255, 255, 255};
+  uint8_t valves[8] = {12, 2, 0, 14, 255, 255, 255, 255};
   char valveLabels[8][20];
   bool valveStatuses[8] = {false, false, false, false, false, false, false, false};
   
