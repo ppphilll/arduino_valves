@@ -1,6 +1,6 @@
 /*
  * Name: VALVE MAKER 1.0
- * Author: dhtmldude / ppphilll
+ * Author: dhtmldude / ppphilll 
  * Board: ESP8266MOD (NodeMcu)
  * PCB: 4 relay board
  * 
@@ -19,6 +19,16 @@
  * If the WIFI SSID is unavailable after 30 seconds, it sets up a temporary access point
  * for storing a new configuration.
  * 
+ * Displays available WIFI hotspots for connecting and displays available GPIO numbers 
+ * for mapping the relays and labelling them for control through the UI.
+ * 
+ * Scripts and styles are stored in a separate EEPROM (32kb) and managed through 
+ * the configuration interface.
+ * 
+ * An android app allows the setup of the device much like Alexa by Amazon where 
+ * the app finds the Access Point, connects to it and then reconnects to the new device
+ * on the current wifi so the user can access its features via the embedded web app.
+ *  
  * */
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
@@ -42,7 +52,7 @@ const int EEPROM_SIZE = 2048;
 const uint8_t avail_pins[5] = {12, 2, 0, 14, 255};
 
 //the place holder for the html source code
-String configPage = "<div id=\"config\" class=\"center-div\"><div class=\"container\"><form action=\"/configuration.save\" method=\"POST\"><table><tr><th colspan=\"2\">WIFI Setup</th></tr><tr> <td><label for=\"_ssid\">SSID: </label></td><td><select name=\"_ssid\"><!--WIFI_OPTIONS--></select></td></tr><tr> <td><label for=\"_password\">Password: </label></td><td><input type=\"password\" name=\"_password\"></td></tr><tr> <td><label for=\"_host\">Host: </label></td><td><input type=\"text\" name=\"_host\"></td></tr></table><!-- RELAYS --></div><div class=\"container\" style=\"float:right\"><table><tr><th>Script</th></tr><tr><td><textarea name=\"script\"></textarea></td></tr><tr><th>Style</th></tr><tr><td><textarea name=\"style\"></textarea></td></tr></table></div><div><div><input type=\"submit\" value=\"Save Configuration\"/></div></form><div><form action=\"/configuration.reset\" method=\"POST\"><input type=\"submit\" value=\"Factory Reset\"></form></div></div></div></div></div>";
+String configPage = "<div id=\"config\" class=\"center-div\"><div class=\"container\"><form action=\"/configuration.save\" method=\"POST\"><table><tr><th colspan=\"2\">WIFI Setup</th></tr><tr> <td><label for=\"_ssid\">SSID: </label></td><td><select name=\"_ssid\"><!--WIFI_OPTIONS--></select></td></tr><tr> <td><label for=\"_password\">Password: </label></td><td><input type=\"password\" name=\"_password\" required /></td></tr><tr> <td><label for=\"_host\">Host: </label></td><td><input type=\"text\" name=\"_host\" required  maxlength=\"15\"/></td></tr></table><!-- RELAYS --></div><div class=\"container\" style=\"float:right\"><table><tr><th>Script</th></tr><tr><td><textarea name=\"script\"></textarea></td></tr><tr><th>Style</th></tr><tr><td><textarea name=\"style\"></textarea></td></tr></table></div><div><div><input type=\"submit\" value=\"Save Configuration\"/></div></form><div><form action=\"/configuration.reset\" method=\"POST\"><input type=\"submit\" value=\"Factory Reset\"></form></div></div></div></div></div>";
 
 //html includes
 String redirect = "<html><head><meta http-equiv=\"refresh\" content=\"10;url=/\" /></head><body>Redirecting in 10 seconds...</body></html>";
@@ -167,8 +177,8 @@ String getWifiSetup(){
          sHTML += "<td><select name=\"pin_#\" class=\"inputsmall\"><!--OPTIONS_#-->";
          sHTML += "</select></td></tr>";
          //break before the next field
-         sHTML += "<tr class=\"spaceAfter\"><td>Label</td><td><input type=\"text\" name=\"label_$\" value=\"relay_label_value_$\" required/></td>";
-         sHTML += "<td>Label</td><td><input type=\"text\" name=\"label_#\" value=\"relay_label_value_#\" required/></td></tr>";
+         sHTML += "<tr class=\"spaceAfter\"><td>Label</td><td><input type=\"text\" name=\"label_$\" value=\"relay_label_value_$\" required maxlength=\"20\"/></td>";
+         sHTML += "<td>Label</td><td><input type=\"text\" name=\"label_#\" value=\"relay_label_value_#\" required maxlength=\"20\"/></td></tr>";
   
   String out = "";
   
