@@ -42,11 +42,11 @@ const int EEPROM_SIZE = 2048;
 const uint8_t avail_pins[5] = {12, 2, 0, 14, 255};
 
 //the place holder for the html source code
-String configPage = "<div id=\"config\" class=\"center-div\"><div class=\"container\"><form action=\"/configuration.save\" method=\"POST\"><table><tr><th colspan=\"2\">WIFI Setup</th></tr><tr> <td><label for=\"_ssid\">SSID: </label></td><td><input type=\"text\" name=\"_ssid\"></td></tr><tr> <td><label for=\"_password\">Password: </label></td><td><input type=\"password\" name=\"_password\"></td></tr><tr> <td><label for=\"_host\">Host: </label></td><td><input type=\"text\" name=\"_host\"></td></tr></table><!-- RELAYS --></div><div class=\"container\" style=\"float:right\"><table><tr><th>Script</th></tr><tr><td><textarea name=\"script\"></textarea></td></tr><tr><th>Style</th></tr><tr><td><textarea name=\"style\"></textarea></td></tr></table></div><div><div><input type=\"submit\" value=\"Save Configuration\"/></div></form><div><form action=\"/configuration.reset\" method=\"POST\"><input type=\"submit\" value=\"Factory Reset\"></form></div></div></div></div></div>";
+String configPage = "<div id=\"config\" class=\"center-div\"><div class=\"container\"><form action=\"/configuration.save\" method=\"POST\"><table><tr><th colspan=\"2\">WIFI Setup</th></tr><tr> <td><label for=\"_ssid\">SSID: </label></td><td><select name=\"_ssid\"><!--WIFI_OPTIONS--></select></td></tr><tr> <td><label for=\"_password\">Password: </label></td><td><input type=\"password\" name=\"_password\"></td></tr><tr> <td><label for=\"_host\">Host: </label></td><td><input type=\"text\" name=\"_host\"></td></tr></table><!-- RELAYS --></div><div class=\"container\" style=\"float:right\"><table><tr><th>Script</th></tr><tr><td><textarea name=\"script\"></textarea></td></tr><tr><th>Style</th></tr><tr><td><textarea name=\"style\"></textarea></td></tr></table></div><div><div><input type=\"submit\" value=\"Save Configuration\"/></div></form><div><form action=\"/configuration.reset\" method=\"POST\"><input type=\"submit\" value=\"Factory Reset\"></form></div></div></div></div></div>";
 
 //html includes
 String redirect = "<html><head><meta http-equiv=\"refresh\" content=\"10;url=/\" /></head><body>Redirecting in 10 seconds...</body></html>";
-String pagestart = "<html><head><script src=\"https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js\"></script><script src=\"http://HOST_$/valves/script.js\"></script><link rel=\"stylesheet\" href=\"http://HOST_$/valves/style.css\"></head><body><div class=\"header\"><span class=\"header-title\">Valve Control System</span><span class=\"header-links\"><a href=\"/configuration.html\">Configure</a></span></div>";
+String pagestart = "<html><head><script src=\"https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js\"></script><script src=\"http://HOST_$/valves/script.js\"></script><link rel=\"stylesheet\" href=\"http://HOST_$/valves/style.css\"></head><body><div class=\"header\"><a class=\"header-title\" href=\"/\">Valve Control System</a><span class=\"header-links\"><a href=\"/configuration.html\">Configure</a></span></div>";
 String pageend = "</body></html>";
 
 void setup(void){
@@ -156,12 +156,14 @@ String getOptions(uint8_t selectedPin){
 }
 
 String getWifiSetup(){
+
+  int wifiNetworkCount = WiFi.scanNetworks();
   
   //formats the relay input names and assigns their value
-  String sHTML = "<tr><td>Relay # relay_$</td>";
+  String sHTML = "<tr><td>GPIO</td>";
          sHTML += "<td><select name=\"pin_$\" class=\"inputsmall\"><!--OPTIONS_$-->";
          sHTML += "</select></td>";
-         sHTML += "<td>Relay # relay_#</td>";
+         sHTML += "<td>GPIO</td>";
          sHTML += "<td><select name=\"pin_#\" class=\"inputsmall\"><!--OPTIONS_#-->";
          sHTML += "</select></td></tr>";
          //break before the next field
@@ -193,18 +195,14 @@ String getWifiSetup(){
     out += sHTML;
     
     out.replace("<!--OPTIONS_$-->", getOptions(wifi_config.valves[i]));
-    out.replace("relay_$", String(valve_no));
     out.replace("pin_$", String("pin_") + String(i));
     out.replace("label_$", String("label_") + String(i));
-    //out.replace("relay_value_$", String(valve_pin));
     out.replace("relay_label_value_$", relay_label_value);
     
     if (i < (wifi_config.getValveCount()/2)){
       out.replace("<!--OPTIONS_#-->", getOptions(wifi_config.valves[i+wifi_config.getValveCount()/2]));
-      out.replace("relay_#", String(valve_no_advanced));
       out.replace("pin_#", String("pin_") + String(i+wifi_config.getValveCount()/2));
       out.replace("label_#", String("label_") + String(i+wifi_config.getValveCount()/2));
-      //out.replace("relay_value_#", String(valve_pin_advanced));
       out.replace("relay_label_value_#", relay_label_value_advanced);
     }
   }
@@ -216,9 +214,24 @@ String getWifiSetup(){
   //replace the whole includes section with our HTML
   configPage.replace("<!-- RELAYS -->", outtable);
 
-  //populate the SSID and HOST values
-  configPage.replace("name=\"_ssid\"", "name=\"_ssid\" value=\"" + String(wifi_config.ssid) + "\"");
+  //populate the HOST value
   configPage.replace("name=\"_host\"", "name=\"_host\" value=\"" + String(wifi_config.host) + "\"");
+
+  //populate the wifi networks
+  out = "";
+  if (wifiNetworkCount==0){
+      
+  }else{
+    for (int i=0; i<wifiNetworkCount; i++){
+      out += "<option value=\"" + WiFi.SSID(i) + "\"";
+      if (String(wifi_config.ssid)==WiFi.SSID(i)){
+        out += " selected";
+      }
+      out += ">" + WiFi.SSID(i) + "</option>";
+    }
+
+    configPage.replace("<!--WIFI_OPTIONS-->", out);
+  }
   
   return configPage;
 }
