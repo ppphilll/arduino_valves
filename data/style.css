@@ -1,0 +1,107 @@
+/** MAIN PAGE **/
+.unselectable {
+	-webkit-touch-callout: none;
+	-webkit-user-select: none;
+	-khtml-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+.valve{
+	width: 100px;
+	height: 100px;
+	display: inline;
+	zoom: 300%;
+}
+.valve_label{
+	text-align: center;
+}
+BODY{
+	padding: 0px;
+	margin: 0px;
+	font: 11px Tahoma;
+}
+#valves{
+	text-align:center;
+	padding: 20px;
+	
+}
+
+/* configuration*/
+body
+{
+	background-color: #ffffff;
+}
+.center-div
+{
+	border: solid 1px grey;
+	display: table;
+	margin-right: auto;
+	margin-left: auto;
+	position: relative;
+	border-radius: 10px;
+	padding: 10px;
+	margin-top: 10px;
+	background-color: #fcfcfc;
+}
+table{
+	font: 11px tahoma;
+}
+.inputsmall{
+	width: 50px;
+}
+INPUT{
+	width: 100px;
+}
+INPUT[type=submit]{
+	width: 100%;
+	margin-top: 5px;
+}
+TABLE{
+	width: 100%;
+}
+TH{
+	text-align: center;
+	padding-bottom: 10px;
+}
+TD:first-child{
+	text-align:right;
+}
+TD:nth-child(3){
+	text-align: right;
+}
+TR.spaceAfter>TD {
+	padding-bottom: 1em;
+}
+TEXTAREA{
+	width: 100%;
+	height:145px;
+}
+.container{
+	width: 300px;
+}
+.container:first-child{
+	float: left;
+	padding-right: 10px;
+}
+.container:last-child{
+	float:right;
+	border-left: 1px solid grey;
+}
+
+
+
+/* header */
+.header{
+	padding: 10px;
+	background-color: #F2F2F2;
+	color: #000000;
+	border-bottom: solid 1px grey;
+}
+.header-title{
+	font: 20px Tahoma;
+}
+.header-links{
+	font: 11pt Tahoma;
+	float: right;
+}
