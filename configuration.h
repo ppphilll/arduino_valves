@@ -17,6 +17,7 @@ struct wifi_configuration_t
   
   //valves
   uint8_t valves[8] = {12, 2, 0, 14, 255, 255, 255, 255};
+  String valveSinricIds[8] = {"5c2d7118a4410b42470f1189", "5c2d75cca4410b42470f119e", "5c2d782da4410b42470f11a0", "5c2d8834a651bf490ee59408", "", "", "", ""};
   char valveLabels[8][20];
   bool valveStatuses[8] = {false, false, false, false, false, false, false, false};
   
@@ -24,11 +25,6 @@ struct wifi_configuration_t
   int getValveCount(){
     return (sizeof(valves)/sizeof(*valves));
   }
-
-  //ui config
-  String ON = "#00D800";  //on color
-  String OFF = "#FF0000";  //off color
-  String OFFL = "gray";     //offline color
 };
 
 #endif

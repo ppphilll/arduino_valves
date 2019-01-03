@@ -30,7 +30,9 @@
  * on the current wifi so the user can access its features via the embedded web app.
  *  
  * */
-#include <ESP8266WiFi.h>
+#include <ESP8266WiFiMulti.h>
+#include <WebSocketsClient.h>
+#include <StreamString.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPClient.h>
@@ -41,27 +43,86 @@
 #include <Wire.h>
 #include <EEPROM.h>
 #include <ArduinoJson.h>
+#include <FS.h>
 #include "configuration.h"
 
+ESP8266WiFiMulti WiFiMulti;
 ESP8266WebServer server(80);
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 
-bool isWifiConnected = false;
 wifi_configuration_t wifi_config;
+WebSocketsClient webSocket;
+
+uint64_t heartbeatTimestamp = 0;
+bool isConnected = false;
+bool isWifiConnected = false;
 const int EEPROM_SIZE = 2048;
 const uint8_t avail_pins[5] = {12, 2, 0, 14, 255};
+const String valveSinricIds[8] = {"5c2d7118a4410b42470f1189", "5c2d75cca4410b42470f119e", "5c2d782da4410b42470f11a0", "5c2d8834a651bf490ee59408", "", "", "", ""};
+
+#define HEARTBEAT_INTERVAL 300000
+#define MyApiKey "0e918773-c3df-4281-a4f1-0ded191bb993"
 
 //the place holder for the html source code
 String configPage = "<div id=\"config\" class=\"center-div\"><div class=\"container\"><form action=\"/configuration.save\" method=\"POST\"><table><tr><th colspan=\"2\">WIFI Setup</th></tr><tr> <td><label for=\"_ssid\">SSID: </label></td><td><select name=\"_ssid\"><!--WIFI_OPTIONS--></select></td></tr><tr> <td><label for=\"_password\">Password: </label></td><td><input type=\"password\" name=\"_password\" required /></td></tr><tr> <td><label for=\"_host\">Host: </label></td><td><input type=\"text\" name=\"_host\" required  maxlength=\"15\"/></td></tr></table><!-- RELAYS --></div><div class=\"container\" style=\"float:right\"><table><tr><th>Script</th></tr><tr><td><textarea name=\"script\"></textarea></td></tr><tr><th>Style</th></tr><tr><td><textarea name=\"style\"></textarea></td></tr></table></div><div><div><input type=\"submit\" value=\"Save Configuration\"/></div></form><div><form action=\"/configuration.reset\" method=\"POST\"><input type=\"submit\" value=\"Factory Reset\"></form></div></div></div></div></div>";
 
 //html includes
 String redirect = "<html><head><meta http-equiv=\"refresh\" content=\"10;url=/\" /></head><body>Redirecting in 10 seconds...</body></html>";
-String pagestart = "<html><head><script src=\"https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js\"></script><script src=\"http://HOST_$/valves/script.js\"></script><link rel=\"stylesheet\" href=\"http://HOST_$/valves/style.css\"></head><body><div class=\"header\"><a class=\"header-title\" href=\"/\">Valve Control System</a><span class=\"header-links\"><a href=\"/configuration.html\">Configure</a></span></div>";
+String pagestart = "<html><head><script src=\"https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js\"></script><script src=\"/script.js\"></script><link rel=\"stylesheet\" href=\"/style.css\"></head><body><div class=\"header\"><a class=\"header-title\" href=\"/\">Valve Control System</a><span class=\"header-links\"><a href=\"/configuration.html\">Configure</a></span></div>";
 String pageend = "</body></html>";
+
+void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
+  switch(type) {
+    case WStype_DISCONNECTED:
+      isConnected = false;    
+      Serial.printf("[WSc] Webservice disconnected from sinric.com!\n");
+      break;
+    case WStype_CONNECTED: {
+      isConnected = true;
+      Serial.printf("[WSc] Service connected to sinric.com at url: %s\n", payload);
+      Serial.printf("Waiting for commands from sinric.com ...\n");        
+      }
+      break;
+    case WStype_TEXT: {
+        Serial.printf("[WSc] get text: %s\n", payload);
+          
+        DynamicJsonBuffer jsonBuffer;
+        JsonObject& json = jsonBuffer.parseObject((char*)payload); 
+        String deviceId = json ["deviceId"];     
+        String action = json ["action"];
+        
+        if(action == "setPowerState") { // Switch or Light
+            String value = json ["value"];
+            if(value == "ON") {
+                toggleValve(deviceId, true);
+            } else {
+                toggleValve(deviceId, false);
+            }
+        }
+        else if (action == "test") {
+            Serial.println("[WSc] received test command from sinric.com");
+        }
+      }
+      break;
+    case WStype_BIN:
+      Serial.printf("[WSc] get binary length: %u\n", length);
+      break;
+  }
+}
+
+void toggleValve(String deviceId, bool state){
+  for (byte i=0; i<wifi_config.getValveCount(); i++){
+    if (valveSinricIds[i] == deviceId){
+      Serial.println(String("FOUND ALEXA DEVICE: ") + deviceId);
+      digitalWrite(wifi_config.valves[i], state);
+    }
+  }
+}
 
 void setup(void){
   Serial.begin(9600);
   EEPROM.begin(EEPROM_SIZE);
+  SPIFFS.begin();
   
   //OTA PROGRAMMING SECTION BEGINS
   ArduinoOTA.onStart([]() {
@@ -107,6 +168,12 @@ void setup(void){
   }else{
     EEPROM.get(0, wifi_config);
     wifi_config.dummy_valve = 255;
+
+    //temp
+    //wifi_config.valveSinricIds[0] = "5c2d7118a4410b42470f1189";
+    //wifi_config.valveSinricIds[1] = "5c2d75cca4410b42470f119e";
+    //wifi_config.valveSinricIds[2] = "5c2d782da4410b42470f11a0";
+    //wifi_config.valveSinricIds[3] = "5c2d8834a651bf490ee59408";
   }
   
   //print obtained values
@@ -144,12 +211,36 @@ void setup(void){
   server.on("/configuration.html", handleAdminServe);
   server.on("/configuration.save", handleAdminSave);
   server.on("/configuration.reset", handleAdminReset);
-  server.on("/configuration.import", handleAdminImport);
   server.onNotFound(handleNotFound);
   server.begin();
 
   //debug finished initialization
   Serial.println(F("HTTP server started"));
+}
+
+bool loadFromSpiffs(String path){
+  String dataType = "text/plain";
+  if(path.endsWith("/")) path += "index.htm";
+ 
+  if(path.endsWith(".src")) path = path.substring(0, path.lastIndexOf("."));
+  else if(path.endsWith(".html")) dataType = "text/html";
+  else if(path.endsWith(".htm")) dataType = "text/html";
+  else if(path.endsWith(".css")) dataType = "text/css";
+  else if(path.endsWith(".js")) dataType = "application/javascript";
+  else if(path.endsWith(".png")) dataType = "image/png";
+  else if(path.endsWith(".gif")) dataType = "image/gif";
+  else if(path.endsWith(".jpg")) dataType = "image/jpeg";
+  else if(path.endsWith(".ico")) dataType = "image/x-icon";
+  else if(path.endsWith(".xml")) dataType = "text/xml";
+  else if(path.endsWith(".pdf")) dataType = "application/pdf";
+  else if(path.endsWith(".zip")) dataType = "application/zip";
+  File dataFile = SPIFFS.open(path.c_str(), "r");
+  if (server.hasArg("download")) dataType = "application/octet-stream";
+  if (server.streamFile(dataFile, dataType) != dataFile.size()) {
+  }
+ 
+  dataFile.close();
+  return true;
 }
 
 String getOptions(uint8_t selectedPin){
@@ -255,10 +346,22 @@ void loop(void){
   //process incoming requests
   server.handleClient();
   ArduinoOTA.handle();
+  webSocket.loop();
+
+  if (isConnected) {
+      uint64_t now = millis(); 
+      // Send heartbeat in order to avoid disconnections during ISP resetting IPs over night. Thanks @MacSass
+      if((now - heartbeatTimestamp) > HEARTBEAT_INTERVAL) {
+          heartbeatTimestamp = now;
+          webSocket.sendTXT("H");          
+      }
+  }   
 }
 
 //handle a 404 not found
 void handleNotFound(){
+  if (loadFromSpiffs(server.uri())) return;
+  
   String message = "Not Found\n\n";
   message += "URI: ";
   message += server.uri();
@@ -279,33 +382,6 @@ void handleAdminServe(){
   page += pageend;
   
   server.send(200, "text/html", page);
-}
-
-//resets the configuration screens from the HOST's html includes
-void handleAdminImport(){
-  HTTPClient http;
-
-  //initialize http connection
-  http.begin(String("http://") + wifi_config.host + String("/valves/configuration.html"));
-  int httpCode = http.GET();
-
-  //print http code and display error otherwise on screen
-  Serial.println(String("HTTP Code for config screen: ") + httpCode);
-
-  if (httpCode!=200) flashLCDWith("SCREENS NOT FOUND");    
-  else{
-    //http.getString().toCharArray(configPage, 1);
-    configPage = http.getString();
-  
-    //print html obtained values
-    Serial.print(F("CONFIG PAGE IN MEMORY STRUCT"));
-    Serial.println(configPage);
-    Serial.println(F("----"));
-    
-    //do a final update on the eeprom
-    //EEPROM.put(0, wifi_configuration);
-    //EEPROM.commit();
-  }
 }
 
 //save the valve configuration and wifi settings
@@ -518,77 +594,6 @@ String makeValve(int i, bool state, bool isDummy){
   return dwg;
 }
 
-
-//deprecated, left here for reference to methods only
-/*
-void readConfiguration(){
-  HTTPClient http;
-
-  //initialize http connection
-  http.begin(String("http://") + wifi_config.host + String("/valves/configuration.json"));
-  int httpCode = http.GET();
-
-  //print http code and display error otherwise on screen
-  Serial.println(String("HTTP Code for config file: ") + httpCode);
-
-  if (httpCode!=200) flashLCDWith("CONFIG NOT FOUND");    
-
-  //get the config file
-  String payload = http.getString();
-
-  Serial.println("HERE IS THE PAYLOAD");
-  Serial.println(payload);
-  Serial.println("----");
-
-  return;
-
-  //parse json object
-  StaticJsonBuffer<900> jsonBuffer;
-  JsonVariant variant = jsonBuffer.parse(payload);
-
-  //convert json object into configuration struct
-  for (byte i=0; i<wifi_config.getValveCount(); i++){
-    String _pin = variant["valves"][i]["pin"];
-    String _label = variant["valves"][i]["label"];
-    bool _status = (variant["valves"][i]["status"]=="ON") ? true : false;
-    
-    wifi_config.valves[i] = atoi(_pin.c_str());
-    strcpy(wifi_config.valveLabels[i], _label.c_str());
-    wifi_config.valveStatuses[i] = _status;
-  }
-}
-*/
-
-//saves the configuration read by the readConfiguration method 
-//to the EEPROM.  The readConfiguration method reads the primer
-//or the startup values and stores them in memory.
-//deprecated, left here for reference to methods only
-/*
-bool saveConfiguration(){
-
-  String out = "";
-  StaticJsonBuffer<600> jsonBuffer;
-  JsonObject& root = jsonBuffer.createObject();
-  JsonArray& valves = root.createNestedArray("valves");
-
-  for (byte i=0; i<wifi_config.getValveCount(); i++){
-    bool isDummy = (wifi_config.valves[i] == wifi_config.dummy_valve); //again ???
-    String _state = (wifi_config.valveStatuses[i] ? "ON" : "OFF");
-    if (isDummy){ _state = "OFFLINE"; }
-
-    JsonObject& valve = valves.createNestedObject();
-    valve["no"] = i;
-    valve["status"] = _state;
-    valve["label"] = wifi_config.valveLabels[i];
-  }
-
-  //root.prettyPrintTo(Serial);
-  root.prettyPrintTo(out);
-  
-  return true;
-}
-*/
-
 void handleAdminReset(){
   for (int i=0; i<EEPROM_SIZE; i++){
     EEPROM.write(i, 0);
@@ -632,17 +637,15 @@ void setupWIFI(){
     return;
   }
 
-  //initialize the wifi
-  WiFi.begin(wifi_config.ssid, wifi_config.password);
-  Serial.println(F(""));
+  WiFiMulti.addAP(wifi_config.ssid, wifi_config.password);
+  Serial.print("Connecting to Wifi: ");
+  Serial.println(wifi_config.ssid);  
   lcd.print(F("CONNECTING "));
 
-  //wait for connection, print dots
-  
-  //###### what to do if connection fails
+  // Waiting for Wifi connect
   int waitCount = 0;
-  int waitMax = 30;  //wait 30 seconds to connect to wifi
-  while (WiFi.status() != WL_CONNECTED) {
+  int waitMax = 30;
+  while(WiFiMulti.run() != WL_CONNECTED) {
     delay(500);
     Serial.print(F("."));
     lcd.print(F("."));  //print the dots showing a connection is being made
@@ -659,11 +662,28 @@ void setupWIFI(){
       return;
     }
   }
-
+  
+  if(WiFiMulti.run() == WL_CONNECTED) {
+    Serial.println("");
+    Serial.print("WiFi connected. ");
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
+  }
+  
   isWifiConnected = true;
 
   //destroy the access point, we're now on the network
   WiFi.softAPdisconnect(true);
+
+  // server address, port and URL
+  webSocket.begin("iot.sinric.com", 80, "/");
+
+  // event handler
+  webSocket.onEvent(webSocketEvent);
+  webSocket.setAuthorization("apikey", MyApiKey);
+  
+  // try again every 5000ms if connection has failed
+  webSocket.setReconnectInterval(5000);
 
   //erase the dots
   lcd.setCursor(0, 0);
