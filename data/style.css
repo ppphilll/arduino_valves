@@ -50,6 +50,9 @@ table{
 .inputsmall{
 	width: 50px;
 }
+.inputlarge{
+	width: 200px;
+}
 INPUT{
 	width: 100px;
 }
