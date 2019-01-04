@@ -56,15 +56,14 @@ WebSocketsClient webSocket;
 uint64_t heartbeatTimestamp = 0;
 bool isConnected = false;
 bool isWifiConnected = false;
-const int EEPROM_SIZE = 2048;
+const int EEPROM_SIZE = 2560;
 const uint8_t avail_pins[5] = {12, 2, 0, 14, 255};
-const String valveSinricIds[8] = {"5c2d7118a4410b42470f1189", "5c2d75cca4410b42470f119e", "5c2d782da4410b42470f11a0", "5c2d8834a651bf490ee59408", "", "", "", ""};
 
 #define HEARTBEAT_INTERVAL 300000
 #define MyApiKey "0e918773-c3df-4281-a4f1-0ded191bb993"
 
 //the place holder for the html source code
-String configPage = "<div id=\"config\" class=\"center-div\"><div class=\"container\"><form action=\"/configuration.save\" method=\"POST\"><table><tr><th colspan=\"2\">WIFI Setup</th></tr><tr> <td><label for=\"_ssid\">SSID: </label></td><td><select name=\"_ssid\"><!--WIFI_OPTIONS--></select></td></tr><tr> <td><label for=\"_password\">Password: </label></td><td><input type=\"password\" name=\"_password\" required /></td></tr><tr> <td><label for=\"_host\">Host: </label></td><td><input type=\"text\" name=\"_host\" required  maxlength=\"15\"/></td></tr></table><!-- RELAYS --></div><div class=\"container\" style=\"float:right\"><table><tr><th>Script</th></tr><tr><td><textarea name=\"script\"></textarea></td></tr><tr><th>Style</th></tr><tr><td><textarea name=\"style\"></textarea></td></tr></table></div><div><div><input type=\"submit\" value=\"Save Configuration\"/></div></form><div><form action=\"/configuration.reset\" method=\"POST\"><input type=\"submit\" value=\"Factory Reset\"></form></div></div></div></div></div>";
+String configPage = "<div id=\"config\" class=\"center-div\"><div class=\"container\"><form action=\"/configuration.save\" method=\"POST\"><table><tr><th colspan=\"2\">WIFI Setup</th></tr><tr> <td><label for=\"_ssid\">SSID: </label></td><td><select name=\"_ssid\"><!--WIFI_OPTIONS--></select></td></tr><tr> <td><label for=\"_password\">Password: </label></td><td><input type=\"password\" name=\"_password\" required /></td></tr><tr> <td><label for=\"_host\">Host: </label></td><td><input type=\"text\" name=\"_host\" required  maxlength=\"15\"/></td></tr></table><!-- RELAYS --></div><div><div><input type=\"submit\" value=\"Save Configuration\"/></div></form><div><form action=\"/configuration.reset\" method=\"POST\"><input type=\"submit\" value=\"Factory Reset\"></form></div></div></div></div></div>";
 
 //html includes
 String redirect = "<html><head><meta http-equiv=\"refresh\" content=\"10;url=/\" /></head><body>Redirecting in 10 seconds...</body></html>";
@@ -112,7 +111,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
 void toggleValve(String deviceId, bool state){
   for (byte i=0; i<wifi_config.getValveCount(); i++){
-    if (valveSinricIds[i] == deviceId){
+    if (String(wifi_config.valveSinricIds[i]) == deviceId){
       Serial.println(String("FOUND ALEXA DEVICE: ") + deviceId);
       digitalWrite(wifi_config.valves[i], state);
     }
@@ -168,12 +167,6 @@ void setup(void){
   }else{
     EEPROM.get(0, wifi_config);
     wifi_config.dummy_valve = 255;
-
-    //temp
-    //wifi_config.valveSinricIds[0] = "5c2d7118a4410b42470f1189";
-    //wifi_config.valveSinricIds[1] = "5c2d75cca4410b42470f119e";
-    //wifi_config.valveSinricIds[2] = "5c2d782da4410b42470f11a0";
-    //wifi_config.valveSinricIds[3] = "5c2d8834a651bf490ee59408";
   }
   
   //print obtained values
@@ -189,7 +182,7 @@ void setup(void){
   if (isWifiConnected){
     Serial.println("Valve configuration stored in EEPROM");
     for (byte i=0; i<wifi_config.getValveCount(); i++){
-      Serial.println(String("Valve # ") + String(i) + String(" at pin ") + String(wifi_config.valves[i]) + String(" with label ") + String(wifi_config.valveLabels[i]));
+      Serial.println(String("Valve # ") + String(i) + String(" at pin ") + String(wifi_config.valves[i]) + String(" with label ") + String(wifi_config.valveLabels[i]) + String(" with Sinric ID: ") + String(wifi_config.valveSinricIds[i]));
     }
     Serial.println("----");
   }
@@ -268,9 +261,11 @@ String getWifiSetup(){
          sHTML += "<td><select name=\"pin_#\" class=\"inputsmall\"><!--OPTIONS_#-->";
          sHTML += "</select></td></tr>";
          //break before the next field
-         sHTML += "<tr class=\"spaceAfter\"><td>Label</td><td><input type=\"text\" name=\"label_$\" value=\"relay_label_value_$\" required maxlength=\"20\"/></td>";
+         sHTML += "<tr><td>Label</td><td><input type=\"text\" name=\"label_$\" value=\"relay_label_value_$\" required maxlength=\"20\"/></td>";
          sHTML += "<td>Label</td><td><input type=\"text\" name=\"label_#\" value=\"relay_label_value_#\" required maxlength=\"20\"/></td></tr>";
-  
+         sHTML += "<tr class=\"spaceAfter\"><td>Sinric ID</td><td><input type=\"text\" name=\"sinric_$\" value=\"sinric_value_$\" class=\"inputlarge\"/></td>";
+         sHTML += "<td>Sinric ID</td><td><input type=\"text\" name=\"sinric_#\" value=\"sinric_value_#\" class=\"inputlarge\"/></td></tr>";
+          
   String out = "";
   
   for (int i=0; i<wifi_config.getValveCount()/2; i++){
@@ -299,12 +294,16 @@ String getWifiSetup(){
     out.replace("pin_$", String("pin_") + String(i));
     out.replace("label_$", String("label_") + String(i));
     out.replace("relay_label_value_$", relay_label_value);
+    out.replace("sinric_$", String("sinric_") + String(i));
+    out.replace("sinric_value_$", String(wifi_config.valveSinricIds[i]));
     
     if (i < (wifi_config.getValveCount()/2)){
       out.replace("<!--OPTIONS_#-->", getOptions(wifi_config.valves[i+wifi_config.getValveCount()/2]));
       out.replace("pin_#", String("pin_") + String(i+wifi_config.getValveCount()/2));
       out.replace("label_#", String("label_") + String(i+wifi_config.getValveCount()/2));
       out.replace("relay_label_value_#", relay_label_value_advanced);
+      out.replace("sinric_#", String("sinric_") + String(i+wifi_config.getValveCount()/2));
+      out.replace("sinric_value_#", String(wifi_config.valveSinricIds[i+wifi_config.getValveCount()/2]));
     }
   }
 
@@ -435,13 +434,15 @@ void handleAdminSave(){
   for (byte i=0; i<wifi_config.getValveCount(); i++){
     uint8_t _pin = server.arg(String("pin_") + String(i)).toInt();
     String _label = server.arg(String("label_") + String(i));
+    String _sinric = server.arg(String("sinric_") + String(i));
 
-    Serial.println(String("Saving valve: ") + i + String(" Pin: ") + _pin + String(" Label: ") + _label);
+    Serial.println(String("Saving valve: ") + i + String(" Pin: ") + _pin + String(" Label: ") + _label + String(" Sinric ID: ") + _sinric);
 
     if (_label.length()!=0){
       //copy the pins and labels assigned
       wifi_config.valves[i] = _pin;
       strcpy(wifi_config.valveLabels[i], _label.c_str());
+      strcpy(wifi_config.valveSinricIds[i], _sinric.c_str());
     }else{
       //return error
       server.sendHeader("Location", "/configuration.html?error=1", true);
@@ -607,14 +608,20 @@ void handleAdminReset(){
 }
 
 void setupAP(){
-  boolean result = WiFi.softAP("BETTINA", "password");
+  //de-initialize the wifi
+  WiFi.disconnect();
+  
+  boolean result = WiFi.softAP("BETTINA", "password123");
   if (result){
     Serial.println(F("AP Mode started."));
     lcd.print(F("Connect to SSID"));
     lcd.setCursor(0, 1);
-    lcd.print(F("SSID: BETTINA"));
+    IPAddress myIP = WiFi.softAPIP();
+    lcd.print(String("IP ADDR: ") + myIP);
     lcd.setCursor(0, 2);
-    lcd.print(F("PASS: password"));
+    lcd.print(F("SSID: BETTINA"));
+    lcd.setCursor(0, 3);
+    lcd.print(F("PASS: password123"));
   }else{
     Serial.println(F("AP Mode failed."));
     lcd.clear();
@@ -657,7 +664,9 @@ void setupWIFI(){
       lcd.clear();
       lcd.print(F("WIFI Unavailable"));
       delay(3000);
-      Serial.println(String("Connection attempts to ") + wifi_config.ssid + String("exceeded.  Setting up Access Point."));
+      Serial.println(F(""));
+      Serial.println(String("Connection attempts to ") + wifi_config.ssid + String(" exceeded."));
+      Serial.println(String("Setting up Access Point."));  
       setupAP();
       return;
     }
