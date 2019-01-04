@@ -114,8 +114,36 @@ void toggleValve(String deviceId, bool state){
     if (String(wifi_config.valveSinricIds[i]) == deviceId){
       Serial.println(String("FOUND ALEXA DEVICE: ") + deviceId);
       digitalWrite(wifi_config.valves[i], state);
+      lcdAnimateLoadingAt(0, 3, String(wifi_config.valveLabels[i]) + String(state ? ": ON" : ": OFF"));
     }
   }
+}
+
+void lcdAnimateLoadingAt(int col, int row, String msg){
+  //position the cursor
+  lcd.setCursor(col + 2, row);
+  lcd.print(msg);
+
+  lcd.setCursor(col, row);
+
+  //animate
+  for (byte i=0; i<3; i++){
+    lcd.print("|");
+    delay(250);
+    lcd.setCursor(col, row);
+    lcd.print("/");
+    delay(250);
+    lcd.setCursor(col, row);
+    lcd.print("-");
+    delay(250);
+    lcd.setCursor(col, row);
+    lcd.write(byte(7));
+    delay(250);
+    lcd.setCursor(col, row);
+   }
+
+   lcd.setCursor(col, row);
+   lcd.print("                    "); //20 spaces
 }
 
 void setup(void){
@@ -143,6 +171,19 @@ void setup(void){
   });
   ArduinoOTA.begin();
   //OTA PROGRAMMING SECTION ENDS
+
+  byte customBackslash[8] = {
+    0b00000,
+    0b10000,
+    0b01000,
+    0b00100,
+    0b00010,
+    0b00001,
+    0b00000,
+    0b00000
+  };
+
+  lcd.createChar(7, customBackslash);
 
   Serial.println(F("Initializing display..."));
 
