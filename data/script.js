@@ -32,6 +32,8 @@ function init(){
 	if ($("#config").length){
 
 	}
+	
+	setInterval(function(){ sendRequest(254, false); }, 1000);
 }
 
 function resizeAllValves(){
