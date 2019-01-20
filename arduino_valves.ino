@@ -71,6 +71,7 @@ String pagestart = "<html><head><script src=\"https://ajax.googleapis.com/ajax/l
 String pageend = "</body></html>";
 
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
+  Serial.println(String("[WSc] WebSocket Type: ") + String(type));
   switch(type) {
     case WStype_DISCONNECTED:
       isConnected = false;    
@@ -112,8 +113,9 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 void toggleValve(String deviceId, bool state){
   for (byte i=0; i<wifi_config.getValveCount(); i++){
     if (String(wifi_config.valveSinricIds[i]) == deviceId){
-      Serial.println(String("FOUND ALEXA DEVICE: ") + deviceId);
+      Serial.println(String("[WSc] Alexa command: ") + deviceId + String(" State: ") + state);
       digitalWrite(wifi_config.valves[i], state);
+      wifi_config.valveStatuses[i] = state;
       lcdAnimateLoadingAt(0, 3, String(wifi_config.valveLabels[i]) + String(state ? ": ON" : ": OFF"));
     }
   }
@@ -137,7 +139,7 @@ void lcdAnimateLoadingAt(int col, int row, String msg){
     lcd.print("-");
     delay(250);
     lcd.setCursor(col, row);
-    lcd.write(byte(7));
+    lcd.write(byte(0));
     delay(250);
     lcd.setCursor(col, row);
    }
@@ -173,17 +175,13 @@ void setup(void){
   //OTA PROGRAMMING SECTION ENDS
 
   byte customBackslash[8] = {
-    0b00000,
-    0b10000,
-    0b01000,
-    0b00100,
-    0b00010,
-    0b00001,
-    0b00000,
-    0b00000
+    0b00000, 0b00100,
+    0b10010, 0b00001,
+    0b10001, 0b00010,
+    0b00100, 0b00000
   };
 
-  lcd.createChar(7, customBackslash);
+  lcd.createChar(0, customBackslash);
 
   Serial.println(F("Initializing display..."));
 
@@ -393,6 +391,7 @@ void loop(void){
       // Send heartbeat in order to avoid disconnections during ISP resetting IPs over night. Thanks @MacSass
       if((now - heartbeatTimestamp) > HEARTBEAT_INTERVAL) {
           heartbeatTimestamp = now;
+          Serial.println(F("[WSc] Sending heartbeat"));
           webSocket.sendTXT("H");          
       }
   }   
@@ -451,7 +450,7 @@ void handleAdminSave(){
   Serial.println(F("-----"));
 
   //update the ssid and password
-  if (!(_ssid[0]&_password[0]&_host[0])){
+  if (_ssid!="" && _password!= "" && _host!=""){
     //update the ssid and password
     strcpy(wifi_config.ssid, _ssid);
     strcpy(wifi_config.password, _password);
@@ -486,7 +485,7 @@ void handleAdminSave(){
       strcpy(wifi_config.valveSinricIds[i], _sinric.c_str());
     }else{
       //return error
-      server.sendHeader("Location", "/configuration.html?error=1", true);
+      server.sendHeader("Location", "/configuration.html?error=2", true);
       flashLCDWith("ERROR");
       server.send(302, "text/plain", "");
       return;
